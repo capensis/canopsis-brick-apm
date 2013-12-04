@@ -5,5 +5,5 @@ all:
 	@make -C widgets all
 
 .PHONY: install
-install:
+install: all
 	@make -C widgets install
