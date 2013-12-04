@@ -5,4 +5,4 @@ The Application Performance Manager brick provides tools for advanced checks in 
 ## Tools provided
 
 - Widget Scheduler : Display duration of scheduled checks, hierarchycally classed by group, jobs, step, ...
-
+     Required: Highstock >= 1.3.7
