@@ -1,3 +1,4 @@
+PREFIX="/opt/canopsis"
 WIDGETSDIR="$(PREFIX)/var/www/canopsis/widgets/"
 
 .PHONY: all
