@@ -1,0 +1,2 @@
+U:RDoc::Attr[iI"work_pool:ETI"Bunny::Channel#work_pool;FI"R;T:publico:RDoc::Markup::Document:@parts[o:RDoc::Markup::Paragraph;	[I"X@return [Bunny::ConsumerWorkPool] Thread pool delivered messages are dispatched to.;T:
+@fileI"lib/bunny/channel.rb;T:0@omit_headings_from_table_of_contents_below0F@I"Bunny::Channel;FcRDoc::NormalClass0

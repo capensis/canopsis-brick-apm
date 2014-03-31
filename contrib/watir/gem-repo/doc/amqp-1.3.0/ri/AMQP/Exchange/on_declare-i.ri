@@ -1,0 +1,2 @@
+U:RDoc::Attr[iI"on_declare:ETI"AMQP::Exchange#on_declare;FI"RW;T:publico:RDoc::Markup::Document:@parts[o:RDoc::Markup::Paragraph;	[I"d@return [#call] A callback that is executed once declaration notification (exchange.declare-ok);To:RDoc::Markup::Verbatim;	[I"from the broker arrives.;T:@format0:
+@fileI"lib/amqp/exchange.rb;T:0@omit_headings_from_table_of_contents_below0F@I"AMQP::Exchange;FcRDoc::NormalClass0

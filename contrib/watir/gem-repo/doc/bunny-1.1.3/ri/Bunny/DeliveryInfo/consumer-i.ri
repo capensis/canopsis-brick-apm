@@ -1,0 +1,2 @@
+U:RDoc::Attr[iI"consumer:ETI"!Bunny::DeliveryInfo#consumer;FI"R;T:publico:RDoc::Markup::Document:@parts[o:RDoc::Markup::Paragraph;	[I"<@return [Bunny::Consumer] Consumer this delivery is for;T:
+@fileI"lib/bunny/delivery_info.rb;T:0@omit_headings_from_table_of_contents_below0F@I"Bunny::DeliveryInfo;FcRDoc::NormalClass0

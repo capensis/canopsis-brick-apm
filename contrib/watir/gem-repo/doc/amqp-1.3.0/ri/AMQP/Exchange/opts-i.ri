@@ -1,0 +1,2 @@
+U:RDoc::Attr[iI"	opts:ETI"AMQP::Exchange#opts;FI"RW;T:publico:RDoc::Markup::Document:@parts[o:RDoc::Markup::Paragraph;	[I"?Options hash this exchange instance was instantiated with ;TI"@return [Hash];T:
+@fileI"lib/amqp/exchange.rb;T:0@omit_headings_from_table_of_contents_below0F@I"AMQP::Exchange;FcRDoc::NormalClass0

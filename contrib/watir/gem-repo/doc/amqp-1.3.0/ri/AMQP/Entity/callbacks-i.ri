@@ -1,0 +1,2 @@
+U:RDoc::Attr[iI"callbacks:ETI"AMQP::Entity#callbacks;FI"R;T:publico:RDoc::Markup::Document:@parts[o:RDoc::Markup::Paragraph;	[I"@return [Array<#call>];T:
+@fileI"lib/amqp/entity.rb;T:0@omit_headings_from_table_of_contents_below0F@I"AMQP::Entity;FcRDoc::NormalModule0

@@ -1,0 +1,2 @@
+U:RDoc::Attr[iI"default_consumer:ETI"!AMQP::Queue#default_consumer;FI"R;T:publico:RDoc::Markup::Document:@parts[o:RDoc::Markup::Paragraph;	[I"Q@return [AMQP::Consumer] Default consumer (registered with {Queue#consume}).;T:
+@fileI"lib/amqp/queue.rb;T:0@omit_headings_from_table_of_contents_below0F@I"AMQP::Queue;FcRDoc::NormalClass0

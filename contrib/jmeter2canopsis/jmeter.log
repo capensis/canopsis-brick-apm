@@ -1,0 +1,18 @@
+2014/03/17 13:06:20 INFO  - jmeter.util.JMeterUtils: Setting Locale to fr_FR 
+2014/03/17 13:06:20 INFO  - jmeter.util.JMeterUtils: Could not find resources for 'fr_FR', using 'fr' 
+2014/03/17 13:06:20 INFO  - jmeter.JMeter: Loading user properties from: /opt/apache-jmeter-2.11/bin/user.properties 
+2014/03/17 13:06:20 INFO  - jmeter.JMeter: Loading system properties from: /opt/apache-jmeter-2.11/bin/system.properties 
+2014/03/17 13:06:20 INFO  - jmeter.JMeter: Copyright (c) 1998-2014 The Apache Software Foundation 
+2014/03/17 13:06:20 INFO  - jmeter.JMeter: Version 2.11 r1554548 
+2014/03/17 13:06:20 INFO  - jmeter.JMeter: java.version=1.6.0_30 
+2014/03/17 13:06:20 INFO  - jmeter.JMeter: java.vm.name=OpenJDK 64-Bit Server VM 
+2014/03/17 13:06:20 INFO  - jmeter.JMeter: os.name=Linux 
+2014/03/17 13:06:20 INFO  - jmeter.JMeter: os.arch=amd64 
+2014/03/17 13:06:20 INFO  - jmeter.JMeter: os.version=2.6.32-431.el6.x86_64 
+2014/03/17 13:06:20 INFO  - jmeter.JMeter: file.encoding=UTF-8 
+2014/03/17 13:06:20 INFO  - jmeter.JMeter: Default Locale=français (France) 
+2014/03/17 13:06:20 INFO  - jmeter.JMeter: JMeter  Locale=français (France) 
+2014/03/17 13:06:20 INFO  - jmeter.JMeter: JMeterHome=/opt/apache-jmeter-2.11 
+2014/03/17 13:06:20 INFO  - jmeter.JMeter: user.dir  =/opt/jmeter2canopsis 
+2014/03/17 13:06:20 INFO  - jmeter.JMeter: PWD       =/opt/jmeter2canopsis 
+2014/03/17 13:06:20 INFO  - jmeter.JMeter: IP: 192.168.251.249 Name: watir FullName: 192.168.251.249 

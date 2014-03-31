@@ -1,0 +1,2 @@
+U:RDoc::Attr[iI"queues:ETI"Bunny::Channel#queues;FI"R;T:publico:RDoc::Markup::Document:@parts[o:RDoc::Markup::Paragraph;	[I"R@return [Hash<String, Bunny::Queue>] Queue instances declared on this channel;T:
+@fileI"lib/bunny/channel.rb;T:0@omit_headings_from_table_of_contents_below0F@I"Bunny::Channel;FcRDoc::NormalClass0

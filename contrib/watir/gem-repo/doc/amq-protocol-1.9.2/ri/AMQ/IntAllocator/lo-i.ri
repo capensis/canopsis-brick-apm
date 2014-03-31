@@ -1,0 +1,2 @@
+U:RDoc::Attr[iI"lo:ETI"AMQ::IntAllocator#lo;FI"R;T:publico:RDoc::Markup::Document:@parts[o:RDoc::Markup::Paragraph;	[I"S@return [Integer] Lower boundary of the integer range available for allocation;T:
+@fileI"lib/amq/int_allocator.rb;T:0@omit_headings_from_table_of_contents_below0F@I"AMQ::IntAllocator;FcRDoc::NormalClass0

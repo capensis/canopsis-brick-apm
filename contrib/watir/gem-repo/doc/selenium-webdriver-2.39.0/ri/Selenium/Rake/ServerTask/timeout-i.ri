@@ -1,0 +1,2 @@
+U:RDoc::Attr[iI"timeout:ETI"'Selenium::Rake::ServerTask#timeout;FI"RW;T:publico:RDoc::Markup::Document:@parts[o:RDoc::Markup::Paragraph;	[I"6Timeout in seconds for the server to start/stop. ;TI"Default: 30;T:
+@fileI"%lib/selenium/rake/server_task.rb;T:0@omit_headings_from_table_of_contents_below0F@I"Selenium::Rake::ServerTask;FcRDoc::NormalClass0

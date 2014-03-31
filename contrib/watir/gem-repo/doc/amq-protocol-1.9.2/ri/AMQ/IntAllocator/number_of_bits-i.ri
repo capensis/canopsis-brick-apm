@@ -1,0 +1,2 @@
+U:RDoc::Attr[iI"number_of_bits:ETI"%AMQ::IntAllocator#number_of_bits;FI"R;T:publico:RDoc::Markup::Document:@parts[o:RDoc::Markup::Paragraph;	[I"A@return [Integer] Number of integers in the allocation range;T:
+@fileI"lib/amq/int_allocator.rb;T:0@omit_headings_from_table_of_contents_below0F@I"AMQ::IntAllocator;FcRDoc::NormalClass0

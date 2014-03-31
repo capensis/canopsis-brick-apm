@@ -1,0 +1,2 @@
+U:RDoc::Attr[iI"next_publish_seq_no:ETI"'Bunny::Channel#next_publish_seq_no;FI"R;T:publico:RDoc::Markup::Document:@parts[o:RDoc::Markup::Paragraph;	[I"B@return [Integer] Next publisher confirmations sequence index;T:
+@fileI"lib/bunny/channel.rb;T:0@omit_headings_from_table_of_contents_below0F@I"Bunny::Channel;FcRDoc::NormalClass0

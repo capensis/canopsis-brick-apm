@@ -1,0 +1,2 @@
+U:RDoc::Attr[iI"	fork:ETI"Cucumber::Rake::Task#fork;FI"RW;T:publico:RDoc::Markup::Document:@parts[o:RDoc::Markup::Paragraph;	[I"SWhether or not to fork a new ruby interpreter. Defaults to true. You may gain ;TI"Tsome startup speed if you set it to false, but this may also cause issues with ;TI"your load path and gems.;T:
+@fileI"lib/cucumber/rake/task.rb;T:0@omit_headings_from_table_of_contents_below0F@I"Cucumber::Rake::Task;FcRDoc::NormalClass0
