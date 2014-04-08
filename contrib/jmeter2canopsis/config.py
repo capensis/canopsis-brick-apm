@@ -4,7 +4,7 @@ DEBUG=False
 PATH_JAVA="/usr/bin/java"
 PATH_JMETER="/opt/jmeter"
 BIN_JMETER="bin/ApacheJMeter.jar"
-JMX_PATH="/opt/jmeter2canopsis/jmx/"
+JMX_PATH="/opt/canopsis-brick-apm/contrib/jmeter2canopsis"
 CSV_PATH="/tmp"
 CMD_JMETER="%s -jar %s -n -t %s"
 
