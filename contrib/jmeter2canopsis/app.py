@@ -1,7 +1,8 @@
 #!bin/python
 #from app import app
-import sys, os, subprocess, csv, json, amqp, re, kombu, glob, socket
+import sys, os, subprocess, csv, json, amqp, re, kombu, glob, socket, time, hashlib
 
+from random import randint
 from config import CMD_JMETER, PATH_JAVA, PATH_JMETER, BIN_JMETER, CSV_PATH, CNTXT_OS, CNTXT_BROWSER, CNTXT_LOCALIZATION, CANOPSIS_AMQP_HOST, CANOPSIS_AMQP_PORT, CANOPSIS_AMQP_USER, CANOPSIS_AMQP_PASS, CANOPSIS_AMQP_VHOST, DEBUG, JMX_PATH
 
 from kombu import Connection, Exchange, Queue, Producer
@@ -31,6 +32,11 @@ def publish2amqp( document ):
 	producer.publish( document, routing_key=rk, serializer="json" )
 
 def proccessing( jmx ):
+
+	uniqueKey = hashlib.md5("%f%i" % ( time.time(), randint(100000000,999999999) )).hexdigest()
+	if debug:
+		print str(uniqueKey)
+
 	cmd = ( "%s" % CMD_JMETER)  % ( PATH_JAVA, ( ( "%s/%s" ) % ( PATH_JMETER, BIN_JMETER ) ), jmx )
 	if debug:
 		print cmd
@@ -63,7 +69,8 @@ def proccessing( jmx ):
 					'cntxt_env':			row[4].split('#')[0],
 					'cntxt_os':				CNTXT_OS,
 					'cntxt_browser':		CNTXT_BROWSER,
-					'cntxt_localization':	CNTXT_LOCALIZATION
+					'cntxt_localization':	CNTXT_LOCALIZATION,
+					'uniqueKey':			str(uniqueKey)
 				}
 
 				document_feature =  {
@@ -93,6 +100,8 @@ def proccessing( jmx ):
 					'cntxt_localization':	info['cntxt_localization'],
 	
 					'state':				0,
+					'uniqueKey':			info['uniqueKey'],
+					'duration':				0
 				}
 				document_scenario['child'] = "%s.%s.%s.%s.%s.%s" % ( document_scenario['connector'], document_scenario['connector_name'], document_scenario['event_type'], document_scenario['source_type'], document_scenario['component'], canopsis_escape_string( info['feature'] ) )
 			
@@ -106,8 +115,12 @@ def proccessing( jmx ):
 				'type_message':		'step',
 
 				'state':			0 if row[5] == "true" else 2,
+				'uniqueKey':		info['uniqueKey'],
+				'duration':			row[1]
 			}
 			document_step['child'] = "%s.%s.%s.%s.%s.%s" % ( document_step['connector'], document_step['connector_name'], document_step['event_type'], document_step['source_type'], document_step['component'], canopsis_escape_string( info['feature'] + "%" + info['scenario'] + "%" + info['cntxt_localization'] + "%" + info['cntxt_os'] + "%" + info['cntxt_browser'] ) )
+
+			document_scenario['duration'] += int( row[1] )
 
 			if row[5] == "false":
 				document_scenario['state'] = 2 if document_scenario['state'] == 0 else 0

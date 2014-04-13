@@ -1,9 +1,7 @@
 Soit /^l'utilisation d'un navigateur$/ do
-	@browser = Watir::Browser.new(:firefox)
 end
 
 Soit /^l'utilisation d'un formulaire$/ do
-	@browser = Watir::Browser.new(:firefox)
 end
 
 Quand /^je clique sur le lien "([^"]*)"$/ do |arg1|
