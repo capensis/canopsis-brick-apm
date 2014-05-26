@@ -1,4 +1,4 @@
-#!bin/python
+#!/comp/jmeter2canopsis/bin/python
 #--------------------------------
 # copyright (c) 2011 "capensis" [http://www.capensis.com]
 #
@@ -18,11 +18,10 @@
 # along with canopsis.  if not, see <http://www.gnu.org/licenses/>.
 # ---------------------------------
 
-#from app import app
 import sys, os, subprocess, csv, json, amqp, re, kombu, glob, socket, time, hashlib
 
 from random import randint
-from config import CMD_JMETER, PATH_JAVA, PATH_JMETER, BIN_JMETER, CSV_PATH, CNTXT_OS, CNTXT_BROWSER, CNTXT_LOCALIZATION, CANOPSIS_AMQP_HOST, CANOPSIS_AMQP_PORT, CANOPSIS_AMQP_USER, CANOPSIS_AMQP_PASS, CANOPSIS_AMQP_VHOST, DEBUG, JMX_PATH
+from config import CMD_JMETER, PATH_JAVA, PATH_JMETER, BIN_JMETER, CSV_PATH, CNTXT_OS, CNTXT_BROWSER, CNTXT_LOCATION, CANOPSIS_AMQP_HOST, CANOPSIS_AMQP_PORT, CANOPSIS_AMQP_USER, CANOPSIS_AMQP_PASS, CANOPSIS_AMQP_VHOST, DEBUG, JMX_PATH
 
 from kombu import Connection, Exchange, Queue, Producer
 
@@ -56,7 +55,7 @@ def proccessing( jmx ):
 	if debug:
 		print str(uniqueKey)
 
-	cmd = ( "%s" % CMD_JMETER ) % ( PATH_JAVA, ( ( "%s/%s" ) % ( PATH_JMETER, BIN_JMETER ) ), jmx )
+	cmd = ( "%s" % CMD_JMETER)  % ( PATH_JAVA, ( ( "%s/%s" ) % ( PATH_JMETER, BIN_JMETER ) ), jmx )
 	if debug:
 		print cmd
 
@@ -73,122 +72,101 @@ def proccessing( jmx ):
 
 	#['timeStamp', 'elapsed', 'label', 'responseCode', 'threadName', 'success', 'bytes', 'grpThreads', 'allThreads', 'Latency', 'SampleCount', 'ErrorCount', 'Hostname']
 	info = None
-	rows = csv.reader(open(file, "rb"))
-	for row in rows:
-		#if debug:
-			#print row
+	document_feature = None
+	document_scenario = None
+	if os.path.exists(file):
+		print "=> File Processing %s" % file
+		rows = csv.reader(open(file, "rb"))
+		for row in rows:
+			if debug:
+				print row
 
-		if row[0] != 'timeStamp':
-			if info == None:
-				info = {
-					'robot':				row[12] if len(row) > 12 else socket.gethosname(),
-					'app':					row[4].split('#')[1],
-					'feature':				row[4].split('#')[2],
-					'scenario':				row[4].split('#')[3],
-					'cntxt_env':			row[4].split('#')[0],
-					'cntxt_os':				CNTXT_OS,
-					'cntxt_browser':		CNTXT_BROWSER,
-					'cntxt_localization':	CNTXT_LOCALIZATION,
-					'uniqueKey':			str(uniqueKey),
-					'step_ok':				0,
-					'step_nbr':				0
-				}
+			if row[0] != 'timeStamp':
+				if info == None:
+					info = {
+						'robot':			row[12] if len(row) > 12 else socket.gethosname(),
+						'app':				row[4].split('#')[1],
+						'feature':			row[4].split('#')[2],
+						'scenario':			row[4].split('#')[3],
+						'cntxt_env':			row[4].split('#')[0],
+						'cntxt_os':			CNTXT_OS,
+						'cntxt_browser':		CNTXT_BROWSER,
+						'cntxt_location':		CNTXT_LOCATION,
+						'uniqueKey':			str(uniqueKey),
+						'step_ok':			0,
+						'step_nbr':			0,
+					}
 
-				document_feature =  {
+					document_feature =  {
+						'connector':			'cucumber',
+						'connector_name':		info['robot'],
+						'event_type':			'eue',
+						'source_type':			'resource',
+						'component':			info['app'],
+						'resource':			canopsis_escape_string( info['feature'] ),
+						'type_message':			'feature',
+		
+						'state':			0,
+					}
+
+					document_scenario =  {
+						'connector':			'cucumber',
+						'connector_name':		info['robot'],
+						'event_type':			'eue',
+						'source_type':			'resource',
+						'component':			info['app'],
+						'resource':			canopsis_escape_string( info['feature'] + "%" + info['scenario'] + "%" + info['cntxt_location'] + "%" + info['cntxt_os'] + "%" + info['cntxt_browser'] ),
+						'type_message':			'scenario',
+
+						'cntxt_env':			info['cntxt_env'],
+						'cntxt_os':			info['cntxt_os'],
+						'cntxt_browser':		info['cntxt_browser'],
+						'cntxt_location':		info['cntxt_location'],
+		
+						'state':			0,
+						'uniqueKey':			info['uniqueKey'],
+						'duration':			0,
+						'perf_data_array':		[{ u'metric': u'duration_scenario', u'value':0, u'label':'Duration ' + info['scenario'] },{ u'metric': u'disponibilite', u'value':0, u'max':2, u'min':0}]
+					}
+					document_scenario['child'] = "%s.%s.%s.%s.%s.%s" % ( document_scenario['connector'], document_scenario['connector_name'], document_scenario['event_type'], document_scenario['source_type'], document_scenario['component'], canopsis_escape_string( info['feature'] ) )
+				
+				document_step =  {
 					'connector':		'cucumber',
 					'connector_name':	info['robot'],
 					'event_type':		'eue',
 					'source_type':		'resource',
 					'component':		info['app'],
-					'resource':			canopsis_escape_string( info['feature'] ),
-					'type_message':		'feature',
-	
-					'state':			0,
+					'resource':		canopsis_escape_string( info['feature'] + "%" + info['scenario'] + "%" + row[2] + "%" + info['cntxt_location'] + "%" + info['cntxt_os'] + "%" + info['cntxt_browser'] ),
+					'type_message':		'step',
+
+					'state':		0 if row[5] == "true" else 2,
+					'uniqueKey':		info['uniqueKey'],
+					#'duration':		row[1]
+					'output':		info['cntxt_location'] + ' - Duration: ' + str(int(row[1])),
+					'perf_data_array':	[{ u'metric': u'duration_'+ unicode(row[2],'utf-8').lower(), u'value':row[1] }]
 				}
+				document_step['child'] = "%s.%s.%s.%s.%s.%s" % ( document_step['connector'], document_step['connector_name'], document_step['event_type'], document_step['source_type'], document_step['component'], canopsis_escape_string( info['feature'] + "%" + info['scenario'] + "%" + info['cntxt_location'] + "%" + info['cntxt_os'] + "%" + info['cntxt_browser'] ) )
+				info['step_nbr'] += 1
 
-				document_scenario =  {
-					'connector':			'cucumber',
-					'connector_name':		info['robot'],
-					'event_type':			'eue',
-					'source_type':			'resource',
-					'component':			info['app'],
-					'resource':				canopsis_escape_string( info['feature'] + "%" + info['scenario'] + "%" + info['cntxt_localization'] + "%" + info['cntxt_os'] + "%" + info['cntxt_browser'] ),
-					'type_message':			'scenario',
+				if row[5] == "false":
+					document_scenario['state'] = 2 if document_scenario['state'] == 0 else 0 
+					document_feature['state'] = 2 if document_feature['state'] == 0 else 0 
+				else:
+					info['step_ok'] += 1
 
-					'cntxt_env':			info['cntxt_env'],
-					'cntxt_os':				info['cntxt_os'],
-					'cntxt_browser':		info['cntxt_browser'],
-					'cntxt_localization':	info['cntxt_localization'],
-	
-					'state':				0,
-					'state_type':			1,
-					'uniqueKey':			info['uniqueKey'],
-					'duration':				0,
-				#	'perf_data_array':  [{ 'min': '0', 'max': None, 'metric': 'Duration ' + info['scenario'], 'value': 0, 'type': 'DERIVE', 'unit': None}]
-				}
-				document_scenario['child'] = "%s.%s.%s.%s.%s.%s" % ( document_scenario['connector'], document_scenario['connector_name'], document_scenario['event_type'], document_scenario['source_type'], document_scenario['component'], canopsis_escape_string( info['feature'] ) )
-			
-				#document_scenario['child'] = "%s.%s.%s.%s.%s.%s" % ( document_scenario['connector'], document_scenario['connector_name'], document_scenario['event_type'], document_scenario['source_type'], document_scenario['component'], canopsis_escape_string( info['feature'] ) )
-			
-			document_step =  {
-				'connector':		'cucumber',
-				'connector_name':	info['robot'],
-				'event_type':		'eue',
-				'source_type':		'resource',
-				'component':		info['app'],
-				'resource':			canopsis_escape_string( info['feature'] + "%" + info['scenario'] + "%" + row[2] + "%" + info['cntxt_localization'] + "%" + info['cntxt_os'] + "%" + info['cntxt_browser'] ),
-				'type_message':		'step',
+				#document_scenario['duration'] += int( row[1] )
+				document_scenario['perf_data_array'][0]['value'] += int( row[1] )
+				document_scenario['perf_data_array'][1]['value'] = 2-int( document_scenario['state'] )
+				document_scenario['output'] = info['cntxt_location'] + ' - Duration: ' + str(int(document_scenario['perf_data_array'][0]['value'])) + " - Step OK:" + str(info['step_ok']) + '/' + str(info['step_nbr'])
+				document_scenario['long_output'] = document_scenario['output']
 
-				'state':			0 if row[5] == "true" else 2,
-				'uniqueKey':		info['uniqueKey'],
-				'duration':			row[1],
-				#'perf_data_array':  [{ 'min': '0', 'max': None, 'metric': 'Duration', 'value': row[1], 'type': 'DERIVE', 'unit': None}]
-			}
-			document_step['child'] = "%s.%s.%s.%s.%s.%s" % ( document_step['connector'], document_step['connector_name'], document_step['event_type'], document_step['source_type'], document_step['component'], canopsis_escape_string( info['feature'] + "%" + info['scenario'] + "%" + info['cntxt_localization'] + "%" + info['cntxt_os'] + "%" + info['cntxt_browser'] ) )
-			info['step_nbr'] += 1
-
-			document_scenario['duration'] += int(row[1])
-			#document_scenario['perf_data_array'][0]['value'] += int(row[1])
-
-			if row[5] == "false":
-				document_scenario['state'] = 2 if document_scenario['state'] == 0 else 0
-				document_feature['state'] = 2 if document_feature['state'] == 0 else 0
-			else:
-				info['step_ok'] += 1
-
-			#publish2amqp( document_step )
-
-	document_scenario['output'] = 'Step OK: ' + str(info['step_ok'])  + '/' + str(info['step_nbr'])
-	#document_scenario['long_output'] = 'Step OK: ' + str(info['step_ok'])  + '/' + str(info['step_nbr'])
-
-	#document_scenario['perf_data_array'] = [ { 'metric': 'Duration ' + info['scenario'], 'value': document_scenario['duration'], 'unit': None, 'min': None, 'max': None, 'warn': None, 'crit': None, 'type': 'GAUGE' } ]
-
-	#publish2amqp( document_scenario )
-	
-	document_scenario_perf = {
-		'connector':			document_scenario['connector'],
-		'connector_name':		document_scenario['connector_name'],
-		'event_type':			'check',
-		'source_type':			document_scenario['source_type'],
-		'component':			document_scenario['component'],
-		'resource':				document_scenario['resource'], #canopsis_escape_string( info['feature'] + "%" + info['scenario'] + "%" + info['cntxt_localization'] + "%" + info['cntxt_os'] + "%" + info['cntxt_browser'] ),
-		#'type_message':			'scenario',
-
-		'state':				document_scenario['state'],
-		#'state_type':			1,
-		#'uniqueKey':			document_scenario['uniqueKey'],
-		'output':				document_scenario['output'],
-		'long_output':			document_scenario['output'],
+				publish2amqp( document_step )
 		
-		'perf_data_array':	[
-			{ 'metric': 'duration', 'value': document_scenario['duration'], 'min':0, 'type': 'GAUGE' }
-		]
-	}
-
-	#document_scenario_perf['perf_data_array'] = json.dumps( document_scenario_perf['perf_data_array'] )
-	publish2amqp( document_scenario_perf )
-
-	#publish2amqp( document_feature )
+		#document_scenario['perf_data_array'] = json.dumps( document_scenario['perf_data_array'] )	
+		publish2amqp( document_scenario )
+		publish2amqp( document_feature )
+	else:
+		print "%s, File not found" % file
 
 if len(sys.argv) == 1:
 	if not os.path.exists( JMX_PATH ):
