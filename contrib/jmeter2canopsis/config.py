@@ -1,5 +1,5 @@
-#DEBUG=False
-DEBUG=True
+DEBUG=False
+#DEBUG=True
 
 NBR_PROCESS=5
 PROCESS_PARALLEL=True
@@ -9,7 +9,6 @@ CANOPSIS_AMQP_PORT=5672
 CANOPSIS_AMQP_USER="guest"
 CANOPSIS_AMQP_PASS="guest"
 CANOPSIS_AMQP_VHOST="canopsis"
-
 
 PATH_JAVA="/usr/bin/java"
 PATH_JMETER="/opt/jmeter"

@@ -22,7 +22,7 @@ import sys, os, subprocess, csv, json, amqp, re, kombu, glob, socket, time, hash
 
 from multiprocessing import Pool
 from random import randint
-from config import CMD_JMETER, PATH_JAVA, PATH_JMETER, BIN_JMETER, CSV_PATH, CNTXT_OS, CNTXT_BROWSER, CNTXT_LOCATION, CANOPSIS_AMQP_HOST, CANOPSIS_AMQP_PORT, CANOPSIS_AMQP_USER, CANOPSIS_AMQP_PASS, CANOPSIS_AMQP_VHOST, DEBUG, JMX_PATH, NBR_PROCESS
+from config import CMD_JMETER, PATH_JAVA, PATH_JMETER, BIN_JMETER, CSV_PATH, CNTXT_OS, CNTXT_BROWSER, CNTXT_LOCATION, CANOPSIS_AMQP_HOST, CANOPSIS_AMQP_PORT, CANOPSIS_AMQP_USER, CANOPSIS_AMQP_PASS, CANOPSIS_AMQP_VHOST, DEBUG, JMX_PATH, NBR_PROCESS, PROCESS_PARALLEL
 
 from kombu import Connection, Exchange, Queue, Producer
 
@@ -79,7 +79,7 @@ def proccessing( jmx ):
 	document_feature = None
 	document_scenario = None
 	if os.path.exists(file):
-		print "=> File Processing %s" % file
+		print "=> Start Processing %s" % file
 		rows = csv.reader(open(file, "rb"))
 		for row in rows:
 			if debug:
@@ -172,6 +172,7 @@ def proccessing( jmx ):
 		#document_scenario['perf_data_array'] = json.dumps( document_scenario['perf_data_array'] )	
 		publish2amqp( document_scenario )
 		publish2amqp( document_feature )
+		print "=> Finish Processing %s" % file
 	else:
 		print "%s, File not found" % file
 
@@ -187,10 +188,10 @@ if __name__ == '__main__':
 			if PROCESS_PARALLEL:
 				jmxs.sort()
 				pool = Pool(processes=NBR_PROCESS)
-				pool.map( processing, jmxs )
+				pool.map( proccessing, jmxs )
 			else:
 				for file in jmxs:
-					processing( jmxs )	
+					proccessing( jmxs )	
 
 	elif len(sys.argv) == 2:
 		if not os.path.exists( sys.argv[1] ):
