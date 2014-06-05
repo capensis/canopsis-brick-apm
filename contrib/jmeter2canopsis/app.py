@@ -1,4 +1,4 @@
-#!/comp/jmeter2canopsis/bin/python
+#!/opt/canopsis-brick-apm/contrib/jmeter2canopsis/bin/python
 #--------------------------------
 # copyright (c) 2011 "capensis" [http://www.capensis.com]
 #
@@ -18,10 +18,11 @@
 # along with canopsis.  if not, see <http://www.gnu.org/licenses/>.
 # ---------------------------------
 
-import sys, os, subprocess, csv, json, amqp, re, kombu, glob, socket, time, hashlib
+import sys, os, subprocess, csv, json, amqp, re, kombu, glob, socket, time, hashlib, random, multiprocessing
 
+from multiprocessing import Pool
 from random import randint
-from config import CMD_JMETER, PATH_JAVA, PATH_JMETER, BIN_JMETER, CSV_PATH, CNTXT_OS, CNTXT_BROWSER, CNTXT_LOCATION, CANOPSIS_AMQP_HOST, CANOPSIS_AMQP_PORT, CANOPSIS_AMQP_USER, CANOPSIS_AMQP_PASS, CANOPSIS_AMQP_VHOST, DEBUG, JMX_PATH
+from config import CMD_JMETER, PATH_JAVA, PATH_JMETER, BIN_JMETER, CSV_PATH, CNTXT_OS, CNTXT_BROWSER, CNTXT_LOCATION, CANOPSIS_AMQP_HOST, CANOPSIS_AMQP_PORT, CANOPSIS_AMQP_USER, CANOPSIS_AMQP_PASS, CANOPSIS_AMQP_VHOST, DEBUG, JMX_PATH, NBR_PROCESS
 
 from kombu import Connection, Exchange, Queue, Producer
 
@@ -37,7 +38,7 @@ def publish2amqp( document ):
 	
 	if debug:
 		"AMQP URI => %s" % amqp_uri
-
+	
 	rk = "%s.%s.%s.%s.%s.%s" % ( document['connector'], document['connector_name'], document['event_type'], document['source_type'], document['component'], document['resource'] )
 	if debug:
 		print rk
@@ -47,9 +48,12 @@ def publish2amqp( document ):
 	channel = conn.channel()
 	exch = Exchange("canopsis.events", "topic", durable=True, auto_delete=False)
 	producer = Producer(channel, exchange=exch, serializer="json")
-	producer.publish( document, routing_key=rk, serializer="json" )
+	producer.publish( document, routing_key=rk, serializer="json")
+	time.sleep(500 / 1000000.0)
 
 def proccessing( jmx ):
+	if debug:
+		print multiprocessing.current_process()
 
 	uniqueKey = hashlib.md5("%f%i" % ( time.time(), randint(100000000,999999999) )).hexdigest()
 	if debug:
@@ -107,6 +111,7 @@ def proccessing( jmx ):
 						'type_message':			'feature',
 		
 						'state':			0,
+						'timestamp':			int(time.time()),
 					}
 
 					document_scenario =  {
@@ -126,7 +131,8 @@ def proccessing( jmx ):
 						'state':			0,
 						'uniqueKey':			info['uniqueKey'],
 						'duration':			0,
-						'perf_data_array':		[{ u'metric': u'duration_scenario', u'value':0, u'label':'Duration ' + info['scenario'] },{ u'metric': u'disponibilite', u'value':0, u'max':2, u'min':0}]
+						'perf_data_array':		[{ u'metric': u'duration_scenario', u'value':0, u'label':'Duration ' + info['scenario'] },{ u'metric': u'disponibilite', u'value':0, u'max':2, u'min':0}],
+						'timestamp':			int(time.time()),
 					}
 					document_scenario['child'] = "%s.%s.%s.%s.%s.%s" % ( document_scenario['connector'], document_scenario['connector_name'], document_scenario['event_type'], document_scenario['source_type'], document_scenario['component'], canopsis_escape_string( info['feature'] ) )
 				
@@ -143,7 +149,8 @@ def proccessing( jmx ):
 					'uniqueKey':		info['uniqueKey'],
 					#'duration':		row[1]
 					'output':		info['cntxt_location'] + ' - Duration: ' + str(int(row[1])),
-					'perf_data_array':	[{ u'metric': u'duration_'+ unicode(row[2],'utf-8').lower(), u'value':row[1] }]
+					'perf_data_array':	[{ u'metric': u'duration_'+ unicode(row[2],'utf-8').lower(), u'value':row[1] }],
+					'timestamp':		int(time.time()),
 				}
 				document_step['child'] = "%s.%s.%s.%s.%s.%s" % ( document_step['connector'], document_step['connector_name'], document_step['event_type'], document_step['source_type'], document_step['component'], canopsis_escape_string( info['feature'] + "%" + info['scenario'] + "%" + info['cntxt_location'] + "%" + info['cntxt_os'] + "%" + info['cntxt_browser'] ) )
 				info['step_nbr'] += 1
@@ -168,18 +175,29 @@ def proccessing( jmx ):
 	else:
 		print "%s, File not found" % file
 
-if len(sys.argv) == 1:
-	if not os.path.exists( JMX_PATH ):
-		print "Error the JMX Path: %s for massive processing does not exist" % JMX_PATH
+if __name__ == '__main__':
+	if len(sys.argv) == 1:
+		if not os.path.exists( JMX_PATH ):
+			print "Error the JMX Path: %s for massive processing does not exist" % JMX_PATH
+		else:
+			jmxs = []
+			for file in glob.glob( ("%s/*.jmx" % JMX_PATH) ):
+				jmxs.append( file )
+		
+			if PROCESS_PARALLEL:
+				jmxs.sort()
+				pool = Pool(processes=NBR_PROCESS)
+				pool.map( processing, jmxs )
+			else:
+				for file in jmxs:
+					processing( jmxs )	
+
+	elif len(sys.argv) == 2:
+		if not os.path.exists( sys.argv[1] ):
+			print "Error the JMX File does not exist"
+		else:
+			proccessing( sys.argv[1] )
 	else:
-		for file in glob.glob( ("%s/*.jmx" % JMX_PATH) ):
-			proccessing( file )
-elif len(sys.argv) == 2:
-	if not os.path.exists( sys.argv[1] ):
-		print "Error the JMX File does not exist"
-	else:
-		proccessing( sys.argv[1] )
-else:
-	print "Error on cli command:"
-	print "For multiple processing just create the JMX Path: %s" % JMX_PATH
-	print "For mono processing: ./app.py jmxfile"
+		print "Error on cli command:"
+		print "For multiple processing just create the JMX Path: %s" % JMX_PATH
+		print "For mono processing: ./app.py jmxfile"
