@@ -1,4 +1,4 @@
-#!/opt/canopsis-brick-apm/contrib/jmeter2canopsis/bin/python
+#!bin/python
 #--------------------------------
 # copyright (c) 2011 "capensis" [http://www.capensis.com]
 #
@@ -18,187 +18,196 @@
 # along with canopsis.  if not, see <http://www.gnu.org/licenses/>.
 # ---------------------------------
 
-import sys, os, subprocess, csv, json, amqp, re, kombu, glob, socket, time, hashlib, random, multiprocessing
+import sys, os, subprocess, csv, json, amqp, re, kombu, glob, socket, time, hashlib, random, multiprocessing, logging
 
 from multiprocessing import Pool
 from random import randint
-from config import CMD_JMETER, PATH_JAVA, PATH_JMETER, BIN_JMETER, CSV_PATH, CNTXT_OS, CNTXT_BROWSER, CNTXT_LOCATION, CANOPSIS_AMQP_HOST, CANOPSIS_AMQP_PORT, CANOPSIS_AMQP_USER, CANOPSIS_AMQP_PASS, CANOPSIS_AMQP_VHOST, DEBUG, JMX_PATH, NBR_PROCESS, PROCESS_PARALLEL
+#from config import CMD_JMETER, PATH_JAVA, PATH_JMETER, BIN_JMETER, CSV_PATH, CNTXT_OS, CNTXT_BROWSER, CNTXT_LOCATION, CANOPSIS_AMQP_HOST, CANOPSIS_AMQP_PORT, CANOPSIS_AMQP_USER, CANOPSIS_AMQP_PASS, CANOPSIS_AMQP_VHOST, DEBUG, JMX_PATH, NBR_PROCESS, PROCESS_PARALLEL
 
 from kombu import Connection, Exchange, Queue, Producer
 
-debug = DEBUG
+from daemon import runner
 
-def canopsis_escape_string( str ):
-	return re.sub( r"%", ".", re.sub( r"\s+", "-", re.sub( r"(\.|-|\"|\'|http:\/\/)", "", str ) ) )
+#debug = DEBUG
 
-def publish2amqp( document ):
-	amqp_uri = "amqp://%s:%s@%s:%s/%s" % ( CANOPSIS_AMQP_USER, CANOPSIS_AMQP_PASS, CANOPSIS_AMQP_HOST, CANOPSIS_AMQP_PORT, CANOPSIS_AMQP_VHOST )
-	if debug:
-		print document
+def unwrap_self_processing(arg, **kwarg):
+    return App.processing(*arg, **kwarg)
+
+class App():
+    def __init__(self):
+        self.stdin_path = '/dev/null'
+        self.stdout_path = '/dev/tty'
+        self.stderr_path = '/dev/tty'
+        self.pidfile_path = '/var/run/mydaemon.pid'
+        self.pidfile_timeout = 5
+
+    def clean_string(self,str):
+        return re.sub( r"%", ".", re.sub( r"\s+", "-", re.sub( r"(\.|-|\"|\'|http:\/\/)", "", str ) ) )
+
+    def publish2amqp(self,doc):
+        logger.debug( doc )
+        
+        amqp_uri = "amqp://%s:%s@%s:%s/%s" % ( self.config['AMQP']['USER'], self.config['AMQP']['PASS'], self.config['AMQP']['HOST'], self.config['AMQP']['PORT'], self.config['AMQP']['VHOST'] )
+	logger.debug( "AMQP URI => %s" % amqp_uri )
 	
-	if debug:
-		"AMQP URI => %s" % amqp_uri
-	
-	rk = "%s.%s.%s.%s.%s.%s" % ( document['connector'], document['connector_name'], document['event_type'], document['source_type'], document['component'], document['resource'] )
-	if debug:
-		print rk
+	rk = "%s.%s.%s.%s.%s.%s" % ( doc['connector'], doc['connector_name'], doc['event_type'], doc['source_type'], doc['component'], doc['resource'] )
+        logger.debug( rk )
 	
 	conn = Connection(amqp_uri)
 	conn.connect()
-	channel = conn.channel()
-	exch = Exchange("canopsis.events", "topic", durable=True, auto_delete=False)
-	producer = Producer(channel, exchange=exch, serializer="json")
-	producer.publish( document, routing_key=rk, serializer="json")
-	time.sleep(500 / 1000000.0)
+        if conn.connected:
+            channel = conn.channel()
+            exch = Exchange("canopsis.events", "topic", durable=True, auto_delete=False)
+            producer = Producer(channel, exchange=exch, serializer="json")
+            producer.publish( doc, routing_key=rk, serializer="json")
+        else:
+            logging.error( "AMQP Connection failed" )
+            time.sleep(500 / 1000000.0)
 
-def proccessing( jmx ):
-	if debug:
-		print multiprocessing.current_process()
+    def processing(self,jmx):
+        logger.info( multiprocessing.current_process() )
 
 	uniqueKey = hashlib.md5("%f%i" % ( time.time(), randint(100000000,999999999) )).hexdigest()
-	if debug:
-		print str(uniqueKey)
+        logger.debug( "%s" % uniqueKey )
+	
+        cmd = ("%s" % self.config["CMD_JMETER"]) % (self.config["PATH_JAVA"], ("%s/%s" % (self.config["PATH_JMETER"], self.config["BIN_JMETER"])), jmx )
+        logger.debug( cmd )
 
-	cmd = ( "%s" % CMD_JMETER)  % ( PATH_JAVA, ( ( "%s/%s" ) % ( PATH_JMETER, BIN_JMETER ) ), jmx )
-	if debug:
-		print cmd
-
-	if debug:
-		devnull = None
-	else:
-		devnull = open('/dev/null', 'w')
-
-	file = CSV_PATH + '/' + os.path.splitext(os.path.basename( jmx ))[0] + '.csv'
+	file = self.config["CSV_PATH"] + '/' + os.path.splitext(os.path.basename( jmx ))[0] + '.csv'
 	if os.path.exists(file):
-		os.remove(file)
+	    os.remove(file)
 
-	subprocess.call( cmd.split(), stdin=devnull, stdout=devnull, stderr=devnull )
+	subprocess.call( cmd.split(), stdin=None, stdout=None, stderr=None )
 
-	#['timeStamp', 'elapsed', 'label', 'responseCode', 'threadName', 'success', 'bytes', 'grpThreads', 'allThreads', 'Latency', 'SampleCount', 'ErrorCount', 'Hostname']
-	info = None
-	document_feature = None
-	document_scenario = None
-	if os.path.exists(file):
-		print "=> Start Processing %s" % file
-		rows = csv.reader(open(file, "rb"))
-		for row in rows:
-			if debug:
-				print row
+        info = None
+	docFeat = None
+	docScenar = None
+        if os.path.exists(file):
+            logging.info( "=> Start Processing %s" % file )
+            rows = csv.reader(open(file, "rb"))
+            for row in rows:
+                logging.debug( row )
+   
+                if row[0] != 'timeStamp':
+                    if info == None:
+                        info = {
+                            'robot':		row[12] if len(row) > 12 else socket.gethosname(),
+                            'app':	        row[4].split('#')[1],
+                            'feature':		row[4].split('#')[2],
+                            'scenario':		row[4].split('#')[3],
+                            'cntxt_env':	row[4].split('#')[0],
+                            'cntxt_os':		self.config['CNTXT_OS'],
+                            'cntxt_browser':	self.config['CNTXT_BROWSER'],
+                            'cntxt_location':	self.config['CNTXT_LOCATION'],
+                            'uniqueKey':	str(uniqueKey),
+                            'step_ok':		0,
+                            'step_nbr':		0,
+                        }
 
-			if row[0] != 'timeStamp':
-				if info == None:
-					info = {
-						'robot':			row[12] if len(row) > 12 else socket.gethosname(),
-						'app':				row[4].split('#')[1],
-						'feature':			row[4].split('#')[2],
-						'scenario':			row[4].split('#')[3],
-						'cntxt_env':			row[4].split('#')[0],
-						'cntxt_os':			CNTXT_OS,
-						'cntxt_browser':		CNTXT_BROWSER,
-						'cntxt_location':		CNTXT_LOCATION,
-						'uniqueKey':			str(uniqueKey),
-						'step_ok':			0,
-						'step_nbr':			0,
-					}
+                    docFeat =  {
+                        'connector':    	'cucumber',
+                        'connector_name':	info['robot'],
+                        'event_type':	        'eue',
+                        'source_type':  	'resource',
+                        'component':            info['app'],
+                        'resource':		self.clean_string( info['feature'] ),
+                        'type_message':	        'feature',
+                        'state':		0,
+                        'timestamp':	        int(time.time()),
+                    }
 
-					document_feature =  {
-						'connector':			'cucumber',
-						'connector_name':		info['robot'],
-						'event_type':			'eue',
-						'source_type':			'resource',
-						'component':			info['app'],
-						'resource':			canopsis_escape_string( info['feature'] ),
-						'type_message':			'feature',
-		
-						'state':			0,
-						'timestamp':			int(time.time()),
-					}
+                    docScenar =  {
+                        'connector':            'cucumber',
+                        'connector_name':	info['robot'],
+                        'event_type':       	'eue',
+                        'source_type':      	'resource',
+                        'component':    	info['app'],
+                        'resource':		self.clean_string( info['feature'] + "%" + info['scenario'] + "%" + info['cntxt_location'] + "%" + info['cntxt_os'] + "%" + info['cntxt_browser'] ),
+                        'type_message': 	'scenario',
+                        'cntxt_env':    	info['cntxt_env'],
+                        'cntxt_os':		info['cntxt_os'],
+                        'cntxt_browser':	info['cntxt_browser'],
+                        'cntxt_location':	info['cntxt_location'],
+                        'state':		0,
+                        'uniqueKey':	        info['uniqueKey'],
+                        'duration':		0,
+                        'perf_data_array':	[{ u'metric': u'duration_scenario', u'value':0, u'label':'Duration ' + info['scenario'] },{ u'metric': u'disponibilite', u'value':0, u'max':2, u'min':0}],
+                        'timestamp':	        int(time.time()),
+                    }
+                    docScenar['child'] = "%s.%s.%s.%s.%s.%s" % ( docScenar['connector'], docScenar['connector_name'], docScenar['event_type'], docScenar['source_type'], docScenar['component'], self.clean_string( info['feature'] ) )
 
-					document_scenario =  {
-						'connector':			'cucumber',
-						'connector_name':		info['robot'],
-						'event_type':			'eue',
-						'source_type':			'resource',
-						'component':			info['app'],
-						'resource':			canopsis_escape_string( info['feature'] + "%" + info['scenario'] + "%" + info['cntxt_location'] + "%" + info['cntxt_os'] + "%" + info['cntxt_browser'] ),
-						'type_message':			'scenario',
+                    docStep =  {
+                        'connector':	        'cucumber',
+                        'connector_name':	info['robot'],
+                        'event_type':	        'eue',
+                        'source_type':  	'resource',
+                        'component':	        info['app'],
+                        'resource':		self.clean_string( info['feature'] + "%" + info['scenario'] + "%" + row[2] + "%" + info['cntxt_location'] + "%" + info['cntxt_os'] + "%" + info['cntxt_browser'] ),
+                        'type_message':	        'step',
+                        'state':		0 if row[5] == "true" else 2,
+                        'uniqueKey':	        info['uniqueKey'],
+                        'output':		info['cntxt_location'] + ' - Duration: ' + str(int(row[1])),
+                        'perf_data_array':	[{ u'metric': u'duration_'+ unicode(row[2],'utf-8').lower(), u'value':row[1] }],
+                        'timestamp':	        int(time.time()),
+                    }
+                    docStep['child'] = "%s.%s.%s.%s.%s.%s" % ( docStep['connector'], docStep['connector_name'], docStep['event_type'], docStep['source_type'], docStep['component'], self.clean_string( info['feature'] + "%" + info['scenario'] + "%" + info['cntxt_location'] + "%" + info['cntxt_os'] + "%" + info['cntxt_browser'] ) )
+                    info['step_nbr'] += 1
 
-						'cntxt_env':			info['cntxt_env'],
-						'cntxt_os':			info['cntxt_os'],
-						'cntxt_browser':		info['cntxt_browser'],
-						'cntxt_location':		info['cntxt_location'],
-		
-						'state':			0,
-						'uniqueKey':			info['uniqueKey'],
-						'duration':			0,
-						'perf_data_array':		[{ u'metric': u'duration_scenario', u'value':0, u'label':'Duration ' + info['scenario'] },{ u'metric': u'disponibilite', u'value':0, u'max':2, u'min':0}],
-						'timestamp':			int(time.time()),
-					}
-					document_scenario['child'] = "%s.%s.%s.%s.%s.%s" % ( document_scenario['connector'], document_scenario['connector_name'], document_scenario['event_type'], document_scenario['source_type'], document_scenario['component'], canopsis_escape_string( info['feature'] ) )
-				
-				document_step =  {
-					'connector':		'cucumber',
-					'connector_name':	info['robot'],
-					'event_type':		'eue',
-					'source_type':		'resource',
-					'component':		info['app'],
-					'resource':		canopsis_escape_string( info['feature'] + "%" + info['scenario'] + "%" + row[2] + "%" + info['cntxt_location'] + "%" + info['cntxt_os'] + "%" + info['cntxt_browser'] ),
-					'type_message':		'step',
+                    if row[5] == "false":
+                        docScenar['state'] = 2 if docScenar['state'] == 0 else docScenar['state'] 
+                        docFeat['state'] = 2 if docFeat['state'] == 0 else docScenar['state']
+                    else:
+                        info['step_ok'] += 1
 
-					'state':		0 if row[5] == "true" else 2,
-					'uniqueKey':		info['uniqueKey'],
-					#'duration':		row[1]
-					'output':		info['cntxt_location'] + ' - Duration: ' + str(int(row[1])),
-					'perf_data_array':	[{ u'metric': u'duration_'+ unicode(row[2],'utf-8').lower(), u'value':row[1] }],
-					'timestamp':		int(time.time()),
-				}
-				document_step['child'] = "%s.%s.%s.%s.%s.%s" % ( document_step['connector'], document_step['connector_name'], document_step['event_type'], document_step['source_type'], document_step['component'], canopsis_escape_string( info['feature'] + "%" + info['scenario'] + "%" + info['cntxt_location'] + "%" + info['cntxt_os'] + "%" + info['cntxt_browser'] ) )
-				info['step_nbr'] += 1
+                    docScenar['perf_data_array'][0]['value'] += int( row[1] )
+                    docScenar['perf_data_array'][1]['value'] = 2-int( docScenar['state'] )
+                    docScenar['output'] = info['cntxt_location'] + ' - Duration: ' + str(int(docScenar['perf_data_array'][0]['value'])) + " - Step OK:" + str(info['step_ok']) + '/' + str(info['step_nbr'])
+                    docScenar['long_output'] = docScenar['output']
 
-				if row[5] == "false":
-					document_scenario['state'] = 2 if document_scenario['state'] == 0 else 0 
-					document_feature['state'] = 2 if document_feature['state'] == 0 else 0 
-				else:
-					info['step_ok'] += 1
+                    self.publish2amqp( docStep )
+            self.publish2amqp( docScenar )
+            self.publish2amqp( docFeat )
+            logging.info( "Finish Processing %s" % file )
+        else:
+            logging.warning( "%s, File not found" % file )
 
-				#document_scenario['duration'] += int( row[1] )
-				document_scenario['perf_data_array'][0]['value'] += int( row[1] )
-				document_scenario['perf_data_array'][1]['value'] = 2-int( document_scenario['state'] )
-				document_scenario['output'] = info['cntxt_location'] + ' - Duration: ' + str(int(document_scenario['perf_data_array'][0]['value'])) + " - Step OK:" + str(info['step_ok']) + '/' + str(info['step_nbr'])
-				document_scenario['long_output'] = document_scenario['output']
+    def run(self):
+        PATH = os.path.dirname(os.path.abspath(__file__))
+        while True:  
+            logger.info( "Global process start at %s" % 'to' )
 
-				publish2amqp( document_step )
-		
-		#document_scenario['perf_data_array'] = json.dumps( document_scenario['perf_data_array'] )	
-		publish2amqp( document_scenario )
-		publish2amqp( document_feature )
-		print "=> Finish Processing %s" % file
-	else:
-		print "%s, File not found" % file
+            with open( "%s/%s" % (PATH,'config.json') ) as configJson:
+                self.config = json.load(configJson)
+            logger.debug( self.config )
+
+            if not os.path.exists( "%s/jmx" % PATH ):
+                logger.error( "Error the JMX Path: %s/jmx for massive processing does not exist", PATH  )
+            else:
+                jmxs = []
+                for file in glob.glob( "%s/jmx/*.jmx" % PATH ):
+                    jmxs.append( file )
+                    		
+                if self.config["PROCESS_PARALLEL"]:
+                    jmxs.sort()
+                    pool = Pool(processes=self.config["NBR_PROCESS"])
+                    pool.map( unwrap_self_processing, zip([self]*len(jmxs), jmxs) )
+                else:
+                    for file in jmxs:
+                        self.processing(file)	
+
+            #time.sleep(10)
 
 if __name__ == '__main__':
-	if len(sys.argv) == 1:
-		if not os.path.exists( JMX_PATH ):
-			print "Error the JMX Path: %s for massive processing does not exist" % JMX_PATH
-		else:
-			jmxs = []
-			for file in glob.glob( ("%s/*.jmx" % JMX_PATH) ):
-				jmxs.append( file )
-		
-			if PROCESS_PARALLEL:
-				jmxs.sort()
-				pool = Pool(processes=NBR_PROCESS)
-				pool.map( proccessing, jmxs )
-			else:
-				for file in jmxs:
-					proccessing( jmxs )	
+    app = App()
+    logger = logging.getLogger("DaemonLog")
+    logger.setLevel(logging.DEBUG)
+    formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+    handler = logging.FileHandler("/tmp/testdaemon.log")
+    handler.setFormatter(formatter)
+    logger.addHandler(handler)
 
-	elif len(sys.argv) == 2:
-		if not os.path.exists( sys.argv[1] ):
-			print "Error the JMX File does not exist"
-		else:
-			proccessing( sys.argv[1] )
-	else:
-		print "Error on cli command:"
-		print "For multiple processing just create the JMX Path: %s" % JMX_PATH
-		print "For mono processing: ./app.py jmxfile"
+    #daemon_runner = runner.DaemonRunner(app)
+    #daemon_runner.daemon_context.files_preserve=[handler.stream]
+    #daemon_runner.do_action()
+
+    app.run()
