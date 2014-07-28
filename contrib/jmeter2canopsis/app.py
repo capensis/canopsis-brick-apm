@@ -34,7 +34,8 @@ def unwrap_self_processing(arg, **kwarg):
     return App.processing(*arg, **kwarg)
 
 class App():
-    def __init__(self):
+    def __init__(self, path):
+        self.path = path
         self.stdin_path = '/dev/null'
         self.stdout_path = '/dev/tty'
         self.stderr_path = '/dev/tty'
@@ -172,19 +173,21 @@ class App():
             logging.warning( "%s, File not found" % file )
 
     def run(self):
-        PATH = os.path.dirname(os.path.abspath(__file__))
+
         while True:  
             logger.info( "Global process start at %s" % 'to' )
 
-            with open( "%s/%s" % (PATH,'config.json') ) as configJson:
+            with open( "%s/%s" % (self.path,'config.json') ) as configJson:
                 self.config = json.load(configJson)
+                if self.config['PATH_JMETER'][:2] == "./":
+                    self.config['PATH_JMETER'] = "%s/%s" % ( self.path, self.config['PATH_JMETER'][2:] )
             logger.debug( self.config )
 
-            if not os.path.exists( "%s/jmx" % PATH ):
+            if not os.path.exists( "%s/jmx" % self.path ):
                 logger.error( "Error the JMX Path: %s/jmx for massive processing does not exist", PATH  )
             else:
                 jmxs = []
-                for file in glob.glob( "%s/jmx/*.jmx" % PATH ):
+                for file in glob.glob( "%s/jmx/*.jmx" % self.path ):
                     jmxs.append( file )
                     		
                 if self.config["PROCESS_PARALLEL"]:
@@ -198,7 +201,8 @@ class App():
             #time.sleep(10)
 
 if __name__ == '__main__':
-    app = App()
+    path = os.path.dirname(os.path.abspath(__file__))
+    app = App( path )
     logger = logging.getLogger("DaemonLog")
     logger.setLevel(logging.DEBUG)
     formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
@@ -206,8 +210,6 @@ if __name__ == '__main__':
     handler.setFormatter(formatter)
     logger.addHandler(handler)
 
-    #daemon_runner = runner.DaemonRunner(app)
-    #daemon_runner.daemon_context.files_preserve=[handler.stream]
-    #daemon_runner.do_action()
-
-    app.run()
+    daemon_runner = runner.DaemonRunner(app)
+    daemon_runner.daemon_context.files_preserve=[handler.stream]
+    daemon_runner.do_action()
