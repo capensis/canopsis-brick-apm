@@ -18,17 +18,14 @@
 # along with canopsis.  if not, see <http://www.gnu.org/licenses/>.
 # ---------------------------------
 
-import sys, os, subprocess, csv, json, amqp, re, kombu, glob, socket, time, hashlib, random, multiprocessing, logging
+import sys, os, subprocess, csv, json, amqp, re, kombu, glob, socket, time, hashlib, random, logging
 
-from multiprocessing import Pool
+from multiprocessing import Pool, current_process
 from random import randint
-#from config import CMD_JMETER, PATH_JAVA, PATH_JMETER, BIN_JMETER, CSV_PATH, CNTXT_OS, CNTXT_BROWSER, CNTXT_LOCATION, CANOPSIS_AMQP_HOST, CANOPSIS_AMQP_PORT, CANOPSIS_AMQP_USER, CANOPSIS_AMQP_PASS, CANOPSIS_AMQP_VHOST, DEBUG, JMX_PATH, NBR_PROCESS, PROCESS_PARALLEL
 
 from kombu import Connection, Exchange, Queue, Producer
 
 from daemon import runner
-
-#debug = DEBUG
 
 def unwrap_self_processing(arg, **kwarg):
     return App.processing(*arg, **kwarg)
@@ -37,9 +34,9 @@ class App():
     def __init__(self, path):
         self.path = path
         self.stdin_path = '/dev/null'
-        self.stdout_path = '/dev/tty'
-        self.stderr_path = '/dev/tty'
-        self.pidfile_path = '/var/run/mydaemon.pid'
+        self.stdout_path = '/dev/null'
+        self.stderr_path = '/dev/null'
+        self.pidfile_path = '/var/run/jmeter2canopsis.pid'
         self.pidfile_timeout = 5
 
     def clean_string(self,str):
@@ -66,7 +63,7 @@ class App():
             time.sleep(500 / 1000000.0)
 
     def processing(self,jmx):
-        logger.info( multiprocessing.current_process() )
+        logger.info( current_process() )
 
 	uniqueKey = hashlib.md5("%f%i" % ( time.time(), randint(100000000,999999999) )).hexdigest()
         logger.debug( "%s" % uniqueKey )
@@ -175,7 +172,8 @@ class App():
     def run(self):
 
         while True:  
-            logger.info( "Global process start at %s" % 'to' )
+            time_start = time.time()
+            logger.info( "Global process start" )
 
             with open( "%s/%s" % (self.path,'config.json') ) as configJson:
                 self.config = json.load(configJson)
@@ -188,8 +186,9 @@ class App():
             else:
                 jmxs = []
                 for file in glob.glob( "%s/jmx/*.jmx" % self.path ):
-                    jmxs.append( file )
-                    		
+                    if file.replace(("%s/jmx/" % self.path),'') not in self.config['EXCLUDE']:
+                        jmxs.append( file )
+                logger.debug( jmxs )                    		
                 if self.config["PROCESS_PARALLEL"]:
                     jmxs.sort()
                     pool = Pool(processes=self.config["NBR_PROCESS"])
@@ -197,16 +196,18 @@ class App():
                 else:
                     for file in jmxs:
                         self.processing(file)	
-
-            #time.sleep(10)
+            time_end = time.time()
+            time_wait = self.config['WAIT']-(time_end-time_start)
+            logger.debug( "Wait Time: %d" % time_wait )
+            time.sleep( time_wait )
 
 if __name__ == '__main__':
     path = os.path.dirname(os.path.abspath(__file__))
     app = App( path )
-    logger = logging.getLogger("DaemonLog")
+    logger = logging.getLogger("JMeter2Canopsis")
     logger.setLevel(logging.DEBUG)
-    formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
-    handler = logging.FileHandler("/tmp/testdaemon.log")
+    formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
+    handler = logging.FileHandler("/var/log/jmeter2canopsis.log")
     handler.setFormatter(formatter)
     logger.addHandler(handler)
 
